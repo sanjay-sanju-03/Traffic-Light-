@@ -109,7 +109,7 @@ def health():
 
 @app.route('/', methods=['GET'])
 def index():
-    """Serve the web interface."""
+    """Serve the web interface with webcam support."""
     return '''
     <!DOCTYPE html>
     <html lang="en">
@@ -138,7 +138,7 @@ def index():
                 background: white;
                 border-radius: 12px;
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-                max-width: 700px;
+                max-width: 800px;
                 width: 100%;
                 padding: 40px;
             }
@@ -157,6 +157,44 @@ def index():
                 font-size: 14px;
             }
             
+            .tabs {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #e0e0e0;
+            }
+            
+            .tab-button {
+                flex: 1;
+                padding: 15px;
+                border: none;
+                background: none;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: 600;
+                color: #999;
+                border-bottom: 3px solid transparent;
+                transition: all 0.3s ease;
+            }
+            
+            .tab-button.active {
+                color: #667eea;
+                border-bottom-color: #667eea;
+            }
+            
+            .tab-button:hover {
+                color: #764ba2;
+            }
+            
+            .tab-content {
+                display: none;
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            /* Image Upload Styles */
             .upload-area {
                 border: 2px dashed #667eea;
                 border-radius: 8px;
@@ -199,15 +237,34 @@ def index():
                 display: none;
             }
             
+            /* Webcam Styles */
+            .webcam-container {
+                text-align: center;
+            }
+            
+            video {
+                width: 100%;
+                max-width: 600px;
+                border-radius: 8px;
+                background: #000;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            }
+            
+            canvas {
+                display: none;
+            }
+            
             .button-group {
                 display: flex;
                 gap: 10px;
                 margin-top: 20px;
                 justify-content: center;
+                flex-wrap: wrap;
             }
             
             button {
-                padding: 10px 20px;
+                padding: 12px 24px;
                 border: none;
                 border-radius: 6px;
                 font-size: 14px;
@@ -226,6 +283,12 @@ def index():
                 box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
             }
             
+            .btn-primary:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none;
+            }
+            
             .btn-secondary {
                 background: #f0f0f0;
                 color: #333;
@@ -233,6 +296,15 @@ def index():
             
             .btn-secondary:hover {
                 background: #e0e0e0;
+            }
+            
+            .btn-danger {
+                background: #ff4444;
+                color: white;
+            }
+            
+            .btn-danger:hover {
+                background: #dd0000;
             }
             
             .loading {
@@ -304,59 +376,185 @@ def index():
                 margin-top: 15px;
                 border-left: 4px solid #c62828;
             }
+            
+            .status-text {
+                color: #666;
+                font-size: 14px;
+                margin-top: 10px;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🚦 Traffic Signal Recognition</h1>
-            <p class="subtitle">Upload an image to detect traffic light colors</p>
+            <p class="subtitle">Upload an image or use your webcam to detect traffic lights</p>
             
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📸</div>
-                <div class="upload-text">Click or drag image here</div>
-                <div class="upload-subtext">Supports PNG, JPG, JPEG, GIF, BMP (max 16MB)</div>
-                <input type="file" id="fileInput" accept="image/*">
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab(\'webcam\')">📷 Webcam</button>
+                <button class="tab-button" onclick="switchTab(\'upload\')">📸 Image Upload</button>
             </div>
             
-            <div class="button-group">
-                <button class="btn-primary" onclick="document.getElementById('fileInput').click()">
-                    Choose Image
-                </button>
-                <button class="btn-secondary" onclick="resetForm()" id="resetBtn" style="display: none;">
-                    Clear
-                </button>
+            <!-- Webcam Tab -->
+            <div id="webcam" class="tab-content active">
+                <div class="webcam-container">
+                    <video id="video" autoplay playsinline style="display: none;"></video>
+                    <canvas id="canvas"></canvas>
+                    <div id="webcamPlaceholder" style="background: #f0f0f0; border-radius: 8px; padding: 60px 20px; margin-bottom: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">📹</div>
+                        <div style="color: #999; font-size: 16px;">Camera will appear here</div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn-primary" onclick="startWebcam()" id="startBtn">Start Webcam</button>
+                        <button class="btn-danger" onclick="stopWebcam()" id="stopBtn" style="display: none;">Stop Webcam</button>
+                        <button class="btn-secondary" onclick="captureFrame()" id="captureBtn" style="display: none;">Capture & Detect</button>
+                    </div>
+                    
+                    <p class="status-text" id="webcamStatus"></p>
+                </div>
+                
+                <div class="loading" id="webcamLoading">
+                    <div class="spinner"></div>
+                    <p>Processing frame...</p>
+                </div>
+                
+                <div class="error-message" id="webcamError"></div>
+                
+                <div class="result" id="webcamResult">
+                    <img id="webcamResultImage" class="result-image" src="" alt="Result">
+                    <div class="signal-box" id="webcamSignalBox"></div>
+                </div>
             </div>
             
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>Processing image...</p>
-            </div>
-            
-            <div class="error-message" id="errorMessage"></div>
-            
-            <div class="result" id="result">
-                <img id="resultImage" class="result-image" src="" alt="Result">
-                <div class="signal-box" id="signalBox"></div>
-                <button class="btn-secondary" onclick="resetForm()">Detect Another</button>
+            <!-- Image Upload Tab -->
+            <div id="upload" class="tab-content">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">Click or drag image here</div>
+                    <div class="upload-subtext">Supports PNG, JPG, JPEG, GIF, BMP (max 16MB)</div>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn-primary" onclick="document.getElementById(\'fileInput\').click()">
+                        Choose Image
+                    </button>
+                    <button class="btn-secondary" onclick="resetImageForm()" id="imageResetBtn" style="display: none;">
+                        Clear
+                    </button>
+                </div>
+                
+                <div class="loading" id="imageLoading">
+                    <div class="spinner"></div>
+                    <p>Processing image...</p>
+                </div>
+                
+                <div class="error-message" id="imageError"></div>
+                
+                <div class="result" id="imageResult">
+                    <img id="imageResultImage" class="result-image" src="" alt="Result">
+                    <div class="signal-box" id="imageSignalBox"></div>
+                    <button class="btn-secondary" onclick="resetImageForm()">Detect Another</button>
+                </div>
             </div>
         </div>
         
         <script>
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-            const loading = document.getElementById('loading');
-            const result = document.getElementById('result');
-            const resultImage = document.getElementById('resultImage');
-            const signalBox = document.getElementById('signalBox');
-            const errorMessage = document.getElementById('errorMessage');
-            const resetBtn = document.getElementById('resetBtn');
-            
             const signalStyles = {
                 'red': 'signal-red',
                 'yellow': 'signal-yellow',
                 'green': 'signal-green',
                 'none': 'signal-none'
             };
+            
+            // Tab switching
+            function switchTab(tab) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+                document.getElementById(tab).classList.add('active');
+                event.target.classList.add('active');
+            }
+            
+            // ============ WEBCAM FUNCTIONS ============
+            let stream = null;
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            async function startWebcam() {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' }
+                    });
+                    
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    document.getElementById('webcamPlaceholder').style.display = 'none';
+                    
+                    document.getElementById('startBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'inline-block';
+                    document.getElementById('captureBtn').style.display = 'inline-block';
+                    document.getElementById('webcamStatus').textContent = '✅ Camera ready! Click "Capture & Detect" to analyze the traffic light.';
+                    
+                    hideError('webcam');
+                } catch (error) {
+                    showWebcamError('Camera access denied. Please allow camera permission.');
+                }
+            }
+            
+            function stopWebcam() {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                video.style.display = 'none';
+                document.getElementById('webcamPlaceholder').style.display = 'block';
+                
+                document.getElementById('startBtn').style.display = 'inline-block';
+                document.getElementById('stopBtn').style.display = 'none';
+                document.getElementById('captureBtn').style.display = 'none';
+                document.getElementById('webcamStatus').textContent = '';
+                document.getElementById('webcamResult').style.display = 'none';
+            }
+            
+            function captureFrame() {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'frame.jpg');
+                    
+                    showLoading('webcam');
+                    hideError('webcam');
+                    
+                    fetch('/api/detect', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading('webcam');
+                        if (data.success) {
+                            showWebcamResult(data);
+                        } else {
+                            showWebcamError(data.error || 'Detection failed');
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading('webcam');
+                        showWebcamError('Error: ' + error.message);
+                    });
+                }, 'image/jpeg', 0.8);
+            }
+            
+            // ============ IMAGE UPLOAD FUNCTIONS ============
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const imageLoading = document.getElementById('imageLoading');
+            const imageResult = document.getElementById('imageResult');
+            const imageError = document.getElementById('imageError');
             
             uploadArea.addEventListener('click', () => fileInput.click());
             
@@ -386,7 +584,7 @@ def index():
                 if (!file) return;
                 
                 if (!file.type.startsWith('image/')) {
-                    showError('Please select a valid image file');
+                    showImageError('Please select a valid image file');
                     return;
                 }
                 
@@ -397,7 +595,8 @@ def index():
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                showLoading();
+                showLoading('image');
+                hideError('image');
                 
                 fetch('/api/detect', {
                     method: 'POST',
@@ -405,52 +604,66 @@ def index():
                 })
                 .then(response => response.json())
                 .then(data => {
+                    hideLoading('image');
                     if (data.success) {
-                        showResult(data);
+                        showImageResult(data);
                     } else {
-                        showError(data.error || 'Detection failed');
+                        showImageError(data.error || 'Detection failed');
                     }
                 })
                 .catch(error => {
-                    showError('Error: ' + error.message);
-                })
-                .finally(() => {
-                    hideLoading();
+                    hideLoading('image');
+                    showImageError('Error: ' + error.message);
                 });
             }
             
-            function showLoading() {
-                uploadArea.style.display = 'none';
-                result.style.display = 'none';
-                errorMessage.style.display = 'none';
-                resetBtn.style.display = 'none';
-                loading.style.display = 'block';
+            // ============ UI HELPERS ============
+            function showLoading(type) {
+                document.getElementById(type + 'Loading').style.display = 'block';
             }
             
-            function hideLoading() {
-                loading.style.display = 'none';
+            function hideLoading(type) {
+                document.getElementById(type + 'Loading').style.display = 'none';
             }
             
-            function showResult(data) {
-                resultImage.src = data.image;
-                signalBox.textContent = data.signal_text;
-                signalBox.className = 'signal-box ' + signalStyles[data.signal];
-                result.style.display = 'block';
-                resetBtn.style.display = 'inline-block';
+            function showWebcamResult(data) {
+                document.getElementById('webcamResultImage').src = data.image;
+                document.getElementById('webcamSignalBox').textContent = data.signal_text;
+                document.getElementById('webcamSignalBox').className = 'signal-box ' + signalStyles[data.signal];
+                document.getElementById('webcamResult').style.display = 'block';
+                document.getElementById('webcamStatus').textContent = '✅ ' + data.signal_text;
             }
             
-            function showError(message) {
-                errorMessage.textContent = '❌ ' + message;
-                errorMessage.style.display = 'block';
-                uploadArea.style.display = 'block';
+            function showImageResult(data) {
+                document.getElementById('imageResultImage').src = data.image;
+                document.getElementById('imageSignalBox').textContent = data.signal_text;
+                document.getElementById('imageSignalBox').className = 'signal-box ' + signalStyles[data.signal];
+                document.getElementById('imageResult').style.display = 'block';
+                document.getElementById('imageResetBtn').style.display = 'inline-block';
             }
             
-            function resetForm() {
+            function showWebcamError(message) {
+                const errorEl = document.getElementById('webcamError');
+                errorEl.textContent = '❌ ' + message;
+                errorEl.style.display = 'block';
+            }
+            
+            function showImageError(message) {
+                const errorEl = document.getElementById('imageError');
+                errorEl.textContent = '❌ ' + message;
+                errorEl.style.display = 'block';
+            }
+            
+            function hideError(type) {
+                document.getElementById(type + 'Error').style.display = 'none';
+            }
+            
+            function resetImageForm() {
                 fileInput.value = '';
                 uploadArea.style.display = 'block';
-                result.style.display = 'none';
-                errorMessage.style.display = 'none';
-                resetBtn.style.display = 'none';
+                document.getElementById('imageResult').style.display = 'none';
+                document.getElementById('imageError').style.display = 'none';
+                document.getElementById('imageResetBtn').style.display = 'none';
             }
         </script>
     </body>
