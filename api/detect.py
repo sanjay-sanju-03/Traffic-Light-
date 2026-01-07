@@ -7,9 +7,9 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-# Import detector from parent directory
+# Import detector from src directory
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 from signal_detector import TrafficSignalDetector
 
 app = Flask(__name__)
