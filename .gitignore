@@ -1,0 +1,16 @@
+.vercel
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+dist/
+build/
+.DS_Store
+.env.local
+.env.*.local
