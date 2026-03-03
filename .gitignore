@@ -1,16 +1,44 @@
+# Vercel
 .vercel
+
+# Git
 .git
+
+# Python cache
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
-venv/
-.venv
 *.egg-info/
 dist/
 build/
+
+# Virtual environments
+env/
+venv/
+.venv
+
+# OS
 .DS_Store
+
+# Env files
+.env
 .env.local
 .env.*.local
+
+# YOLOv8 model weights (large binary files - download separately)
+*.pt
+*.pth
+*.onnx
+
+# Test / debug scripts (not part of production app)
+test_*.py
+debug_test.py
+verify_fix.py
+examples_unified_detection.py
+utils/debug_detection.py
+utils/generate_images.py
+
+# Deployment docs
+VERCEL_DEPLOY.md
